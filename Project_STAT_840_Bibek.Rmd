@@ -1,0 +1,394 @@
+---
+geometry: margin=1in
+fontsize: 12pt
+documentclass: report
+output: 
+  pdf_document: 
+      fig_caption: yes
+      citation_package: natbib
+      highlight: tango
+bibliography: lazbibreg.bib
+biblio-style: jabes
+subparagraph: yes
+header-includes:
+  \usepackage{mdwlist}
+  \usepackage[compact]{titlesec}
+  \usepackage{titling}
+  \usepackage[font=small,labelfont=bf,tableposition=top]{caption}
+  \usepackage{float}
+  \floatstyle{plaintop}
+ \restylefloat{table}
+  \usepackage{lastpage} 
+  \usepackage{hyperref}
+  \usepackage{colortbl}
+  \usepackage{array}
+  \hypersetup{backref,colorlinks=true}
+  \usepackage{framed,color}
+  \definecolor{shadecolor}{rgb}{0.95, 0.92, 0.88}
+  \usepackage{graphicx}
+  \usepackage{booktabs}
+  \usepackage{fancyhdr}
+  \usepackage[none]{hyphenat}
+  \raggedright
+  \usepackage{amsmath, amsthm, amssymb, bm}
+  \usepackage{marginnote}
+  \usepackage{subfig}
+  \def\mygraphcaption{Here are my graphs.}
+  \newlength{\mygraphwidth}\setlength{\mygraphwidth}{0.9\textwidth}
+  \usepackage{listings}
+---
+  \lstset{
+	basicstyle=\small\ttfamily,
+	columns=flexible,
+	breaklines=true}
+	
+  \pagestyle{fancy}
+  \fancyhead[L]{\textbf{Bibekananda Mishra}}
+  \fancyhead[C]{}
+  \fancyhead[R]{\textbf{STAT 840 Project}}
+  \fancyfoot[L]{}
+  \fancyfoot[C]{}
+  \fancyfoot[R]{Page -\thepage- of \pageref{LastPage}}
+  \fancypagestyle{plain}{\pagestyle{fancy}}
+  \renewcommand{\headrulewidth}{2pt}
+  \renewcommand{\footrulewidth}{2pt}
+ 
+ \hypersetup{
+	colorlinks   = true,
+	citecolor    = blue,
+	linkcolor    = black,
+	urlcolor     = blue
+  }
+  
+  \begin{titlepage}
+   \begin{center}
+       \vspace*{2cm}
+        
+       \vspace{0.5cm}
+ 
+       \textbf{\textit{\LARGE Detection of Prostate Cancer Using Linear Regression Model}}
+ 
+       \vspace{0.5cm}
+      
+       \textbf{\Large STAT 840: Fall Class Project, 2019} 
+       
+        \vspace{0.5cm}
+        
+        \textbf{\large Bibekananda Mishra}
+        
+       \vfill
+ 
+       \vspace{0.7cm}
+ 
+       \includegraphics[width=0.4\textwidth]{figures/ku}
+ 
+       \large Department of Biostatistics and Data Science \\
+       University of Kansas, USA \\
+       `r format(Sys.time(), '%B %e, %Y')`
+ 
+   \end{center}
+\end{titlepage}
+  
+```{r setup, include=FALSE}
+# load packages
+library(knitr)
+library(formatR)
+library(stargazer)
+library(xtable)
+library(ggplot2)    
+library(dplyr)    
+library(readr)    
+library(choroplethr)
+library(tinytex)
+library(lmtest)
+library(car)
+library(olsrr)
+library(psych)
+library(faraway)
+library(leaps)
+library(data.table)
+require(epiDisplay)
+library(gridExtra)
+knitr::opts_chunk$set(echo = TRUE)
+options(digits = 5, width = 60, xtable.comment = FALSE)
+opts_chunk$set(tidy.opts = list(width.cutoff=60), tidy=TRUE)
+out_type <- knitr::opts_knit$get("rmarkdown.pandoc.to")
+```
+
+ \setlength{\headheight}{45pt}
+ 
+\thispagestyle{empty}
+\newpage
+\pagenumbering{roman}
+\setcounter{page}{1}
+\pagestyle{plain}
+\tableofcontents
+\cleardoublepage
+\phantomsection
+\phantomsection
+\newpage
+\pagenumbering{arabic}
+
+\section{Abstract}
+A university medical center urology group was interested in the association between prostate-specific antigen (PSA level) is the response variable and a number of prognostic clinical measurements in men with advanced prostate cancer. Data were collected on 97 men who were about to undergo radical prostectomies. We fit the data in to various statistical models and choose the best among them. Our analysis shows that 'Estimate of Cancer volume' is the most important paarmeter. However, the final model depends upon all the measurements considered in the data in deciding PSA level. The dependency though happens where we are taking into consideration logarithm of PSA level and logarithm of volume of cancer. 
+
+\newpage
+
+\section{Introduction}
+A university medical center urology group collected data on nine measurements from 97 patients who were about to undergo radical prostectomies. The measurements are as follows: prostate-specific antigen level (PSA level), cancer volume, prostate weight, age, amount of benign prostatic hyperplasia, presence of seminal vesicle invasion, degree of capsular penetration and Gleason score. They were interested in finding the association of PSA level with any of the prognostic clinical measurements mentioned above. We fit the data in to various linear regression models, verified the asssumptions involved in the regression, detected and removed outliers and then chose the best model after refitting the data. Our initial analysis shows that 'Cancer volume' and 'Seminal score' are the best indicators in finding PSA level. However, the general model involves log(PSA) and log(cancerrv) apart from the other variables.
+
+The data was presented in the book "Applied Linear Statistical Models" by Kurtner et al. We have referred the book as well as the lecture notes by Prof. Lazarus Mramba for preparing this report. 
+
+\subsection{Primary Analysis Objectives}
+
+First we would like to know whether there is any significant relationship between any two variables/measurements considered in the study. For this, we compute the correlation coffiecients of the associated paarmeters in the analysis and plot the scatter plot for each variable vs another variable. See figure-1.
+
+```{r, echo=FALSE, include=TRUE, message=FALSE}
+pcancer<-read.table("http://users.stat.ufl.edu/~rrandles/sta4210/Rclassnotes/data/textdatasets/KutnerData/Appendix%20C%20Data%20Sets/APPENC05.txt", quote="\"", comment.char="")
+pcancer$V1<-NULL
+setnames(pcancer, old=c("V2","V3","V4","V5","V6","V7","V8","V9"), new=c("psa", "cancerrv","weight","age","hyperplasia","seminal","capsular","score"))
+#head(pcancer)
+pairs.panels(pcancer, density = FALSE, ellipses = FALSE, main = "Figure-1")
+```
+
+From the correlation cofficients, it is apparent that there is no much relationship between the variables except probably between Cancer volume (cancerrv) vs Capsular penetration (capsular). The scatter plot shows the same conclusion. 
+
+Next we compute the Cp value for each model so as to choose the least biased or unbiasedmodel. We have plotted the graph. See figure-2 (a) and (b).
+```{r, echo=FALSE, include=TRUE, message=FALSE}
+mod0 <- regsubsets(psa ~ ., data = pcancer)
+#summary(mod0)
+#summary(mod0)$cp
+cp_min <- which.min(summary(mod0)$cp)
+par(mfrow = c(1, 2))
+plot(1:7, summary(mod0)$cp, type = "b", ylab = expression(C[p]),
+ylim = c(2, 17), lwd = 3, main = "Figure-2(a) Cp variable Selection",
+xlab = "Number of Parameters")
+points(cp_min, summary(mod0)$cp[cp_min], col = "red", cex = 2,
+pch = 20)
+plot(mod0, scale = "Cp", main = "Figure-2(b)")
+```
+
+Seeing the plot, we choose the models having Cp values closest to (p+1) so that the resultant models are least biased. We set two models: 
+[1] Model2 having two variables, cancerrv and seminal
+[2] Model3 having three variables: cancerrv, seminal and score.
+
+We will also consider the full model i.e. Model6 having all the variables.
+
+See the following plots to notice the relationship between cancerrv and psa. The cases in the two plots have been marked with different colors according to seminal and score values respectively.
+
+```{r, echo=FALSE, include=TRUE, message=FALSE}
+ggplot(pcancer, aes(y= psa, x=cancerrv))+ geom_point(aes(color = factor(seminal))) +labs(x= "Cancer Volume", y="PSA", title = "Figure-3(a) PSA vs Cancer Volume")+ geom_smooth(method = "lm")
+ggplot(pcancer, aes(y = psa, x = cancerrv)) + geom_point(aes(color = factor(score)))+labs(x= "Cancer Volume", y="PSA", title = "Figure-3(b) PSA vs Cancer Volume")+ geom_smooth(method = "lm")
+```
+
+It is clear that there is a linear relationship between cancerrv and PSA level. We will test the linearity hypotheis of both the models and compare them with the full models. The F-values for model-2, model-3 and model-6 are as follows: 
+
+Model 2: mod2<-lm(psa~cancerrv+seminal, pcancer)
+\newline
+Model 3: mod3<-lm(psa~cancerrv+seminal+score, pcancer)
+\newline
+Model 6: mod6<-lm(psa~., pcancer)
+\newline
+
+F-values respectively: 3.098e-12, .3063e-12, and .3063e-12.
+
+```{r, echo=FALSE, include=FALSE, message=FALSE}
+mod2<-lm(psa~cancerrv+seminal, pcancer)
+mod3<-lm(psa~cancerrv+seminal+score, pcancer)
+mod6<-lm(psa~., pcancer)
+linearHypothesis(mod2, c("seminal=0", "cancerrv=0"))[2,6]#model2
+linearHypothesis(mod3, c("seminal=0", "cancerrv=0", "score=0"))[2,6]
+linearHypothesis(mod6, c("seminal=0", "cancerrv=0", "capsular=0", "age=0", "weight=0", "score=0"))[2,6]
+```
+Since all the values are less than 0.05, we conclude that the models we are considering are the better ones compared to the null hypothesis as stated in the tests above.
+
+\subsection{Secondary Analysis Objectives}
+
+Next, we verify the assumptions associated with linear regression for each of these three models and check whether there are any outliers in the data. 
+
+a] We have plotted sequential plot of the residuals and noted that the terms are broadly  independent. 
+
+b] We plot the residuals aganist cancerrv to note that the plot is funnel-shaped. The absolute value of residuals plotted against cancerrv also shows that the absolute value increases as cancerrv increases. So, we have to take some remedial measures. We will consider log(psa) instead of psa and model. 
+
+c] The normality plot of residuals shows that there are few cases (namely 95, 96 and 97) which diverge from normality assumption. So we may have to remove these cases.
+
+d] Looking at the residual plots, normal probablity plots, Cook's distance plot and Bonferroni test for each linear model, we find that the cases 96 and 97 are in the outliers.
+
+So, we have to remove those two outlier cases and build model again based on the modified data. We apply our regression model to log(psa) and also experiment by adding nonlinear term cancerrv*seminal. So our new models are as follows:
+
+New model 2: modn2<-lm(log(psa)~log(cancerrv)+seminal, pcancer)
+\newline
+New model 3: modn3<-lm(log(psa)~log(cancerrv)+seminal+score, pcancer)
+\newline
+New Model 6: modn6<-lm(log(psa)~log(cancerrv)+.., pcancer)
+\newline
+
+```{r, echo=FALSE, include=FALSE, message=FALSE}
+pcancer_new<-pcancer[1:95,]
+modn2<-lm(log(psa)~log(cancerrv)+seminal, pcancer_new)
+modn3<-lm(log(psa)~log(cancerrv)+seminal+score, pcancer_new)
+modn6<-lm(log(psa)~log(cancerrv)+seminal+score+age+weight+hyperplasia+capsular, pcancer_new)
+linearHypothesis(modn2, c("seminal=0", "log(cancerrv)=0"))[2,6]#new model2
+linearHypothesis(modn3, c("seminal=0", "log(cancerrv)=0", "score=0"))[2,6]
+linearHypothesis(modn6, c("seminal=0", "log(cancerrv)=0", "capsular=0", "age=0", "weight=0", "score=0"))[2,6]
+```
+Comparing the the multiple r-squared values for the three models above, we choose the model having highest r-squared value i.e. model which explains the data variance the most. See the table below. Moreover, for comparing the models, we use anova test. See the table below. Note that the two entries in anova column denote the F-values of 'modn2 vs modn3' and  modn3 vs modn6' respectively.
+
+```{r,  echo=TRUE, include=FALSE, message=TRUE}
+#F-value comparing model 2 and model 3
+anova(modn2,modn3)[2,6]
+#F-value comparing model 3 and model 6
+anova(modn3,modn6)[2,6]
+```
+\subsection{Table comparing various models}
+
+```{r,  echo=FALSE, results="asis", message=FALSE}
+d <- structure(list(Model = structure(c(1L, 2L, 3L), .Label = c("modn2", "modn3", "modn6"), class = "factor"), predictors = structure(c(1L, 2L, 3L), .Label = c("2", "3", "7"), class = "factor"), 
+  RSE = c(0.73L, 0.72L, 0.68L), Rsquared = c(0.55L, 0.57L, 0.63L), ANOVA_Fvalue =c(0L, 0.039L, 0.018L)), .Names = c("Model", "Num. of predictors", "RSE", "R-Squared", "ANOVA_Fvalue"), class = "data.frame", row.names = c(NA, -3L))
+kable(d)
+```
+
+Since clearly RSE decreases, R-squared value increases and F-values are less than 0.05, model modn6 is the winner here. 
+\newpage
+
+\section{Results}
+
+Our final linear model for this data is: 
+
+```{r tab7,  echo=FALSE, results="asis", message=FALSE}
+xtable(summary(modn6)$coef, caption = "Table of model involving  log(cancerrv), weight, age, hyperplasia, seminal capsular and score.")
+```
+
+
+```{r tab5,  echo=FALSE, results="asis", message=FALSE}
+kable(anova(modn6),
+      caption = "ANOVA for the model",
+      digits = 3)
+```
+
+
+
+\section{Discussion and Conclusion}
+Our analysis shows that the PSA leve depends upon all the parameters considered in the experiment, albeiet in a 'logarithmic' way. Since it only explains 63% of the variation in the data, we believe we can improve this by playing some more with the paaremeters by introducing nonlinear interaction terms. 
+
+\newpage
+
+\section{Appendix: R-code}
+
+\begin{lstlisting}
+---
+title: "lr_project"
+author: "Bibek"
+date: "11/30/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+library(ggplot2)    
+library(dplyr)    
+library(readr)    
+library(choroplethr)
+library(tinytex)
+library(lmtest)
+library(car)
+library(olsrr)
+library(psych)
+library(faraway)
+library(leaps)
+
+library(data.table)
+require(epiDisplay)
+pcancer<-read.table("http://users.stat.ufl.edu/~rrandles/sta4210/Rclassnotes/data/textdatasets/KutnerData/Appendix%20C%20Data%20Sets/APPENC05.txt", quote="\"", comment.char="")
+
+pcancer$V1<-NULL
+
+setnames(pcancer, old=c("V2","V3","V4","V5","V6","V7","V8","V9"), new=c("psa", "cancerrv","weight","age","hyperplasia","seminal","capsular","score"))
+head(pcancer)
+
+pairs.panels(pcancer, density = FALSE, ellipses = FALSE, main = "Scatterplot")
+mod0 <- regsubsets(psa ~ ., data = pcancer)
+
+summary(mod0)
+
+summary(mod0)$cp
+
+cp_min <- which.min(summary(mod0)$cp)
+
+par(mfrow = c(1, 2))
+plot(1:7, summary(mod0)$cp, type = "b", ylab = expression(C[p]),
+ylim = c(2, 17), lwd = 3, main = "Cp variable Selection",
+xlab = "Number of Parameters")
+points(cp_min, summary(mod0)$cp[cp_min], col = "red", cex = 2,
+pch = 20)
+plot(mod0, scale = "Cp")
+
+mod2<-lm(psa~cancerrv+seminal, pcancer)
+
+mod3<-lm(psa~cancerrv+seminal+score, pcancer)
+
+mod6<-lm(psa~., pcancer)
+
+linearHypothesis(mod2, c("seminal=0", "cancerrv=0"))
+
+linearHypothesis(mod3, c("seminal=0", "cancerrv=0", "score=0"))
+
+linearHypothesis(mod6, c("seminal=0", "capsular=0"))
+
+ggplot(pcancer, aes(y= psa, x=cancerrv))+ geom_point(aes(color = factor(seminal))) +labs(x= "Cancer Volume", y="PSA", title = "PSA vs Cancer Volume")+ geom_smooth(method = "lm")
+
+ggplot(pcancer, aes(y = psa, x = cancerrv)) + geom_point(aes(color = factor(score)))+labs(x= "Cancer Volume", y="PSA", title = "PSA vs Cancer Volume")+ geom_smooth(method = "lm")
+
+#assumption verifications for model-2
+ggplot(pcancer, aes(y = residuals(mod2), x = cancerrv)) + geom_point(aes(color = factor(seminal)))+labs(x= "Cancer Volume", y="Residuals(model-2)", title = "Residuals vs Cancer Volume")+ geom_smooth(method = "lm")
+
+plot(mod2)
+
+halfnorm(cooks.distance(mod2))
+
+#assumption verifications for model-3
+#Verifying independence of error terms
+plot(residuals(mod3))+labs(title="Sequence plot of residuals")
+#verifying normaility assumption
+cancer.stdres3<-rstandard(mod3)
+
+qqnorm(cancer.stdres3, ylab="Sample quantiles", xlab="Normal Quantiles", main="Normal probability plot of residuals") 
+
+qqline(cancer.stdres3)
+
+#detection of outlying observations by plotting studentised residual and deleted residuals
+bptest(mod3, ~psa, data = pcancer, studentize = TRUE)
+
+bptest(mod3, ~psa, data = pcancer, studentize = FALSE)
+
+qqPlot(mod3, main="QQ Plot")
+
+ols_plot_resid_stud_fit(mod3)
+
+ggplot(pcancer, aes(y = residuals(mod3), x = cancerrv)) + geom_point(aes(color = factor(seminal)))+labs(x= "Cancer Volume", y="Residuals(model-3)", title = "Residuals vs Cancer Volume")+ geom_smooth(method = "lm")
+
+plot(mod3)
+
+halfnorm(cooks.distance(mod3))
+
+#assumption verifications for model-6
+ggplot(pcancer, aes(y = residuals(mod6), x = cancerrv)) + geom_point(aes(color = factor(seminal)))+labs(x= "Cancer Volume", y="Residuals(model-6)", title = "Residuals vs Cancer Volume")+ geom_smooth(method = "lm")
+
+plot(mod6)
+
+halfnorm(cooks.distance(mod6))
+
+#verifying presence of multicolinearity
+vif(mod2)
+
+#F-value comparing model 2 and model 3
+anova(modn2,modn3)[2,6]
+#F-value comparing model 3 and model 6
+anova(modn3,modn6)[2,6]
+
+pcancer_new<-pcancer[1:95,]
+modn2<-lm(psa~cancerrv+seminal, pcancer_new)
+modn3<-lm(psa~cancerrv+seminal+score, pcancer_new)
+modn6<-lm(psa~., pcancer_new)
+
+\end{lstlisting}
